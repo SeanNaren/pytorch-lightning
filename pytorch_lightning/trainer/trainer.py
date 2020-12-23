@@ -327,6 +327,7 @@ class Trainer(
         self.config_validator = ConfigValidator(self)
         self.data_connector = DataConnector(self)
         self.optimizer_connector = OptimizerConnector(self)
+        self.plugin_connector = PluginConnector(self, plugins)
         self.accelerator_connector = BackendConnector(
             num_processes,
             tpu_cores,
@@ -341,6 +342,7 @@ class Trainer(
             precision,
             amp_backend,
             amp_level,
+            self.plugin_connector.cloud_environment
         )
         self.logger_connector = LoggerConnector(self, log_gpu_memory)
         self.model_connector = ModelConnector(self)
@@ -354,7 +356,6 @@ class Trainer(
         self.tuner = Tuner(self)
         self.evaluation_loop = EvaluationLoop(self)
         self.train_loop = TrainLoop(self, multiple_trainloader_mode)
-        self.plugin_connector = PluginConnector(self)
 
         # training state
         self.model = None
@@ -436,7 +437,8 @@ class Trainer(
         # self.precision_connector.on_trainer_init(precision, amp_level, amp_backend)
 
         # last thing are the plugins which override whatever the trainer used by default
-        self.plugin_connector.on_trainer_init(plugins)
+        # TODO: probably not needed anymore after refactor
+        self.plugin_connector.on_trainer_init()
 
         # Callback system
         self.on_init_end()
@@ -522,7 +524,6 @@ class Trainer(
         self.call_hook("on_before_accelerator_backend_setup", model)
         self.accelerator_backend.setup(self, model)
         self.train_loop.setup_training(model)
-        self.training_type_plugin.pre_training()
 
         # ----------------------------
         # INSPECT THESE FOR MAIN LOOPS
@@ -536,8 +537,10 @@ class Trainer(
         # TRAIN
         # ----------------------------
         # hook
-
         self.call_hook("on_fit_start")
+
+        # plugin will setup training (e.g. ddp will launch child processes)
+        self.training_type_plugin.pre_training()
 
         # double dispatch: let the plugin initiate the training/test loop.
         if self.testing:
