@@ -19,6 +19,7 @@ from pytorch_lightning.accelerators.ddp_cpu_spawn_accelerator import DDPCPUSpawn
 from pytorch_lightning.accelerators.dp_accelerator import DataParallelAccelerator
 from pytorch_lightning.accelerators.gpu_accelerator import GPUAccelerator
 from pytorch_lightning.accelerators.tpu_accelerator import TPUAccelerator
+from pytorch_lightning.accelerators.ipu_accelerator import IPUAccelerator
 from pytorch_lightning.accelerators.horovod_accelerator import HorovodAccelerator
 from pytorch_lightning.accelerators.ddp_hpc_accelerator import DDPHPCAccelerator
 from pytorch_lightning.accelerators.ddp_cpu_hpc_accelerator import DDPCPUHPCAccelerator

@@ -62,6 +62,7 @@ RPC_AVAILABLE = platform.system() != 'Windows' and _module_available('torch.dist
 GROUP_AVAILABLE = platform.system() != 'Windows' and _module_available('torch.distributed.group')
 FAIRSCALE_PIPE_AVAILABLE = FAIRSCALE_AVAILABLE and LooseVersion(torch.__version__) == LooseVersion("1.6.0")
 BOLTS_AVAILABLE = _module_available('pl_bolts')
+POPTORCH_AVAILABLE = _module_available('poptorch')
 
 FLOAT16_EPSILON = numpy.finfo(numpy.float16).eps
 FLOAT32_EPSILON = numpy.finfo(numpy.float32).eps

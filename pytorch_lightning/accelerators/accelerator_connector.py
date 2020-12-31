@@ -15,7 +15,7 @@ import os
 
 import torch
 
-from pytorch_lightning.utilities import HOROVOD_AVAILABLE
+from pytorch_lightning.utilities import HOROVOD_AVAILABLE, POPTORCH_AVAILABLE
 from pytorch_lightning import _logger as log
 from pytorch_lightning import accelerators
 from pytorch_lightning.accelerators.accelerator import Accelerator
@@ -349,6 +349,7 @@ class AcceleratorConnector:
         rank_zero_info(f'GPU available: {torch.cuda.is_available()}, used: {self.trainer.on_gpu}')
         num_cores = self.trainer.tpu_cores if self.trainer.tpu_cores is not None else 0
         rank_zero_info(f'TPU available: {TPU_AVAILABLE}, using: {num_cores} TPU cores')
+        rank_zero_info(f'IPU available: {POPTORCH_AVAILABLE}')
 
         if torch.cuda.is_available() and not self.trainer.on_gpu:
             rank_zero_warn('GPU available but not used. Set the --gpus flag when calling the script.')
