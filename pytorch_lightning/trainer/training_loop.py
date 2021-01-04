@@ -670,15 +670,6 @@ class TrainLoop:
 
             # create an iterable for optimizers and loop over them
             for opt_idx, optimizer in self.prepare_optimizers():
-                if self.override_train_logic:
-                    # todo: get return output correctly for logging
-                    self.run_train_iteration(split_idx, split_batch, opt_idx, optimizer)
-                    # batch_outputs = self._process_closure_result(
-                    #     batch_outputs=batch_outputs,
-                    #     opt_idx=opt_idx,
-                    # )
-                    continue
-
                 # toggle model params + set info to logger_connector
                 self.run_train_split_start(split_idx, split_batch, opt_idx, optimizer)
 
@@ -775,19 +766,6 @@ class TrainLoop:
             yield self.trainer.accelerator_backend.block_ddp_plugin_sync_behaviour()
         else:
             yield None
-
-    @property
-    def override_train_logic(self):
-        if self.trainer.accelerator_backend is not None:
-            return self.trainer.accelerator_backend.override_train_logic
-        return False
-
-    def run_train_iteration(self, *args, **kwargs):
-        """
-        Offload the entire training step to the accelerator.
-        """
-        if self.trainer.accelerator_backend is not None and self.override_train_logic:
-            return self.trainer.accelerator_backend.run_complete_train_step(*args, **kwargs)
 
     def _process_closure_result(
         self, batch_outputs: list, opt_idx: int

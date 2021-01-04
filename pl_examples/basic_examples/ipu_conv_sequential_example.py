@@ -15,7 +15,7 @@
 Experimental script to run a convolutional model using IPUs.
 Currently not using real data but fake generated data, primarily for debugging.
 
-python ipu_conv_sequential_example.py --max_epochs 1
+python ipu_conv_sequential_example.py --max_epochs 1 --limit_val_batches 0
 
 """
 from argparse import ArgumentParser

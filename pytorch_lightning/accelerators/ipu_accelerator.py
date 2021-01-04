@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import copy
 from typing import Any, Callable, Optional, Union
 
 import torch
@@ -130,9 +129,10 @@ class IPUAccelerator(Accelerator):
         args[0] = self.to_type(args[0])
         return model_step(*args[0])
 
-    def run_complete_train_step(self, split_idx, split_batch, opt_idx, optimizer):
-        split_batch = self.to_type(split_batch)
-        return self.train_model(*split_batch)
+    def training_step(self, args) -> None:
+        args = self.to_type(args)
+        output = self._step(self.train_model, args)
+        # todo: we'd like to log the output from training somehow
 
     def validation_step(self, args):
         return self._step(self.validation_model, args)
@@ -157,7 +157,7 @@ class IPUAccelerator(Accelerator):
         return False
 
     @property
-    def override_train_logic(self):
+    def override_optimization(self):
         return True
 
     def on_setup_dataloader(self, dataloader):

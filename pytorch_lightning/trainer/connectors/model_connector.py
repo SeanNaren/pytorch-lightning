@@ -26,7 +26,7 @@ class ModelConnector:
     def copy_trainer_model_properties(self, model):
         ref_model = self._get_reference_model(model)
 
-        automatic_optimization = ref_model.automatic_optimization and self.trainer.train_loop.automatic_optimization
+        automatic_optimization = self._get_automatic_optimization(ref_model)
         self.trainer.train_loop.automatic_optimization = automatic_optimization
 
         for m in [model, ref_model]:
@@ -44,6 +44,11 @@ class ModelConnector:
             m.precision = self.trainer.precision
             m.global_rank = self.trainer.global_rank
             m.local_rank = self.trainer.local_rank
+
+    def _get_automatic_optimization(self, ref_model):
+        if self.trainer.accelerator_backend:
+            return not self.trainer.accelerator_backend.override_optimization
+        return ref_model.automatic_optimization and self.trainer.train_loop.automatic_optimization
 
     def get_model(self):
         return self._get_reference_model(self.trainer.model)

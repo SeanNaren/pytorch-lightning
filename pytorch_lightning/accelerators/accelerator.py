@@ -258,3 +258,11 @@ class Accelerator(object):
         """
         cm = self.ddp_plugin.block_backward_sync(self.trainer.model) if self.ddp_plugin else None
         yield cm
+
+    @property
+    def override_optimization(self):
+        """
+        Override to enable all forward/backward/optimization logic to be contained within the training step.
+        Returns: True if accelerator handles all optimization logic via the training step.
+        """
+        return False
