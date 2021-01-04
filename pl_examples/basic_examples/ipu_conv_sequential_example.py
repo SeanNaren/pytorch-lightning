@@ -15,10 +15,8 @@
 Experimental script to run a convolutional model using IPUs.
 Currently not using real data but fake generated data, primarily for debugging.
 
-python ipu_conv_sequential_example.py --auto_round_num_ipus --gradient_accumulation 9
+python ipu_conv_sequential_example.py --max_epochs 1
 
-gradient_accumulation is tied to pipeline depth.
-auto_round_num_ipus allocates power of 2 IPUs (as designed) to training. This does mean 3 IPUs are unused.
 """
 from argparse import ArgumentParser
 
@@ -42,20 +40,15 @@ class LitResnet(pl.LightningModule):
 
         self.save_hyperparameters()
         self.model = resnet18()
-        self.model.layer1 = poptorch.BeginBlock(self.model.layer1, ipu_id=1)
-        self.model.layer2 = poptorch.BeginBlock(self.model.layer2, ipu_id=2)
-        self.model.layer3 = poptorch.BeginBlock(self.model.layer3, ipu_id=3)
-        self.model.layer4 = poptorch.BeginBlock(self.model.layer4, ipu_id=4)
-        self.proj = torch.nn.Linear(1000, 10)
+        self.model.fc = torch.nn.Linear(self.model.fc.in_features, 10)
         self._example_input_array = torch.randn((1, 3, 32, 32))
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.02)
+        optimizer = torch.optim.SGD(self.parameters(), lr=0.02)
         return optimizer
 
     def forward(self, x):
         x = self.model(x)
-        x = self.proj(x)
         return x
 
     def training_step(self, batch):
