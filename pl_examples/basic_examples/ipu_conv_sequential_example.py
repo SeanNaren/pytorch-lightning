@@ -21,17 +21,13 @@ python ipu_conv_sequential_example.py --max_epochs 1 --limit_val_batches 0
 from argparse import ArgumentParser
 
 import torch
-from torch.utils.data import Dataset
-from torchvision.models import resnet18
 
 import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
 from pytorch_lightning import Trainer
 from pytorch_lightning.accelerators import IPUAccelerator
-from pytorch_lightning.utilities import POPTORCH_AVAILABLE
-
-if POPTORCH_AVAILABLE:
-    import poptorch
+from torch.utils.data import Dataset
+from torchvision.models import resnet18
 
 
 class LitResnet(pl.LightningModule):
@@ -85,11 +81,9 @@ class DummyImageClassificationDataset(Dataset):
         return [x, y]
 
 
-def instantiate_dataset(ipu_opts, batch_size, num_workers):
+def instantiate_dataset(batch_size, num_workers):
     ds = DummyImageClassificationDataset(pixels=224, num_classes=10)
-
-    # todo: we should autoswap torch dataloaders to this type within the accelerator.
-    loader = poptorch.DataLoader(ipu_opts, ds, batch_size=batch_size, num_workers=num_workers)
+    loader = torch.utils.data.DataLoader(ds, batch_size=batch_size, num_workers=num_workers)
     return loader
 
 
@@ -103,11 +97,11 @@ if __name__ == "__main__":
 
     training_opts, inference_opts = IPUAccelerator.parse_opts(args)
 
-    train_loader = instantiate_dataset(ipu_opts=training_opts, batch_size=args.batch_size, num_workers=4)
-
+    train_loader = instantiate_dataset(batch_size=args.batch_size, num_workers=4)
+    val_loader = instantiate_dataset(batch_size=args.batch_size, num_workers=4)
     accelerator = IPUAccelerator(training_opts, inference_opts)
 
     model = LitResnet()
 
     trainer = pl.Trainer.from_argparse_args(args, accelerator=accelerator)
-    trainer.fit(model, train_loader)
+    trainer.fit(model, train_loader, val_loader)

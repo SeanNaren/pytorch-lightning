@@ -14,6 +14,7 @@
 from typing import Any, Callable, Optional, Union
 
 import torch
+from torch.utils.data import DataLoader
 
 from pytorch_lightning.accelerators.accelerator import Accelerator, ReduceOp
 from pytorch_lightning.cluster_environments import ClusterEnvironment
@@ -28,7 +29,12 @@ if POPTORCH_AVAILABLE:
         raise MisconfigurationException("IPU Accelerator requires IPU hardware to run.")
 
 
-class IPUOpts:
+class IPUOptsBuilder:
+    """
+    Class to build IPU opts based on poptorch options.
+    This makes it easier to instantiate new opts from a shared set of arguments, and enforce
+    options for inference.
+    """
     def __init__(self,
                  num_device_iterations: int,
                  replication_factor: int,
@@ -159,14 +165,36 @@ class IPUAccelerator(Accelerator):
     def override_optimization(self):
         return True
 
-    def on_setup_dataloader(self, dataloader):
-        dl_args = dataloader.__dict__
-        dl_args["options"] = self.ipu_opts
-        self.trainer.reinitialize_dataloader(
-            dataloader=dataloader,
-            dl_args=dl_args,
-            cls=poptorch.DataLoader
-        )
+    def on_reset_train_dataloader(self, dataloader: Union[DataLoader, Any]) -> Union[DataLoader, Any]:
+        if isinstance(dataloader, DataLoader):
+            dataloader = self._convert_to_poptorch_loader(
+                dataloader=dataloader,
+                opts=self.training_opts
+            )
+        return dataloader
+
+    def on_reset_eval_dataloader(self, dataloader: Union[DataLoader, Any]) -> Union[DataLoader, Any]:
+        if isinstance(dataloader, DataLoader):
+            dataloader = self._convert_to_poptorch_loader(
+                dataloader=dataloader,
+                opts=self.inference_opts
+            )
+        return dataloader
+
+    def _convert_to_poptorch_loader(self, dataloader, opts):
+        skip_keys = ['dataset_kind']
+        if dataloader.batch_size:
+            # re-create batch sampler in new poptorch loader
+            skip_keys += ['batch_sampler']
+
+        dl_args = {
+            k: v for k, v in dataloader.__dict__.items() if not k.startswith('_') and k not in skip_keys
+        }
+        dl_args["options"] = opts
+        multiprocessing_context = dataloader.multiprocessing_context
+        dataloader = poptorch.DataLoader(**dl_args)
+        dataloader.multiprocessing_context = multiprocessing_context
+        return dataloader
 
     def get_reference_model(self, model) -> LightningModule:
         if not isinstance(model, LightningModule):
@@ -205,7 +233,7 @@ class IPUAccelerator(Accelerator):
 
     @classmethod
     def parse_opts(cls, args):
-        opts = IPUOpts(
+        opts = IPUOptsBuilder(
             num_device_iterations=args.num_device_iterations,
             replication_factor=args.replication_factor,
             gradient_accumulation=args.gradient_accumulation,

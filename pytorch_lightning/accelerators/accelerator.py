@@ -17,6 +17,7 @@ from typing import Any, Optional, Union
 import torch
 import torch.distributed as torch_distrib
 from torch.optim import Optimizer
+from torch.utils.data import DataLoader
 
 from pytorch_lightning.cluster_environments import ClusterEnvironment
 from pytorch_lightning.core.lightning import LightningModule
@@ -241,14 +242,6 @@ class Accelerator(object):
     def rpc_enabled(self):
         return self.ddp_plugin is not None and isinstance(self.ddp_plugin, RPCPlugin)
 
-    @property
-    def distributed_sampler_kwargs(self):
-        raise NotImplementedError
-
-    @property
-    def require_distributed_sampler(self):
-        raise NotImplementedError
-
     @contextmanager
     def block_ddp_plugin_sync_behaviour(self):
         """
@@ -266,3 +259,29 @@ class Accelerator(object):
         Returns: True if accelerator handles all optimization logic via the training step.
         """
         return False
+
+    @property
+    def distributed_sampler_kwargs(self):
+        raise NotImplementedError
+
+    @property
+    def require_distributed_sampler(self):
+        raise NotImplementedError
+
+    def on_reset_train_dataloader(self, dataloader: Union[DataLoader, Any]) -> Union[DataLoader, Any]:
+        """
+        Override to access loader object when initializing/resetting during training.
+        Args:
+            dataloader: The data loader object.
+        Returns: The data loader object.
+        """
+        return dataloader
+
+    def on_reset_eval_dataloader(self, dataloader: Union[DataLoader, Any]) -> Union[DataLoader, Any]:
+        """
+        Override to access loader object when initializing/resetting during validation and testing.
+        Args:
+            dataloader: The data loader object.
+        Returns: The data loader object.
+        """
+        return dataloader
