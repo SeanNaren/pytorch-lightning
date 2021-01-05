@@ -22,13 +22,13 @@ from argparse import ArgumentParser
 
 import torch
 from torch.utils.data import Dataset
+from torchvision.models import resnet18
 
 import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
 from pytorch_lightning import Trainer
 from pytorch_lightning.accelerators import IPUAccelerator
 from pytorch_lightning.utilities import POPTORCH_AVAILABLE
-from torchvision.models import resnet18
 
 if POPTORCH_AVAILABLE:
     import poptorch

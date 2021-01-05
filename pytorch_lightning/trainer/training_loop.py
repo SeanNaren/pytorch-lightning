@@ -312,7 +312,9 @@ class TrainLoop:
         self.trainer.dev_debugger.track_train_loss_history(batch_idx, untouched_loss.detach())
 
     def _check_training_step_output(self, training_step_output):
-        if isinstance(training_step_output, torch.Tensor) and not self.automatic_optimization:
+        if isinstance(training_step_output, torch.Tensor) and not (
+                self.automatic_optimization or self.accelerator_override_optimization):
+
             if training_step_output.grad_fn is None:
                 # TODO: Find why - RuntimeError: Expected to mark a variable ready only once ...
                 raise MisconfigurationException("In manual optimization, `training_step` should not return a Tensor")
@@ -346,7 +348,7 @@ class TrainLoop:
         closure_loss = None
         untouched_loss = None
 
-        if self.trainer.train_loop.automatic_optimization:
+        if self.automatic_optimization or self.accelerator_override_optimization:
             # accumulate loss
             # (if accumulate_grad_batches = 1 no effect)
             if is_result_obj:
@@ -788,7 +790,7 @@ class TrainLoop:
             batch_opt_idx = opt_idx if len(batch_outputs) > 1 else 0
             batch_outputs[batch_opt_idx].append(opt_closure_result.training_step_output_for_epoch_end)
 
-            if self.automatic_optimization:
+            if self.automatic_optimization or self.accelerator_override_optimization:
                 # track total loss for logging (avoid mem leaks)
                 self.accumulated_loss.append(opt_closure_result.loss)
 
@@ -974,3 +976,9 @@ class TrainLoop:
 
         # reset for next set of accumulated grads
         self.accumulated_loss.reset()
+
+    @property
+    def accelerator_override_optimization(self):
+        if self.trainer.accelerator_backend is not None:
+            return self.trainer.accelerator_backend.override_optimization
+        return False

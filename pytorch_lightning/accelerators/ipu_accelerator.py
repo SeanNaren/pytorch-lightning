@@ -131,8 +131,7 @@ class IPUAccelerator(Accelerator):
 
     def training_step(self, args) -> None:
         args = self.to_type(args)
-        output = self._step(self.train_model, args)
-        # todo: we'd like to log the output from training somehow
+        return self._step(self.train_model, args)
 
     def validation_step(self, args):
         return self._step(self.validation_model, args)
