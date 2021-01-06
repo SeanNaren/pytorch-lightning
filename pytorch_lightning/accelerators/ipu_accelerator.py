@@ -161,11 +161,11 @@ class IPUAccelerator(Accelerator):
             log.info('Using 16bit precision, converting model to FP16.')
             model = model.half()
 
+        # Separate models are instantiated for different stages, but they share the same weights on host.
+        # When validation/test models are run, they sync weights first.
+
         # Create model for training which will run training.
         self.train_model = IPUWrapperModule(model=model)
-
-        # todo: if I allocate ipus just for the val model, are the weights shared with my train model? how does this work?
-
         self.train_model = poptorch.trainingModel(
             model=self.train_model,
             options=self.training_opts,
