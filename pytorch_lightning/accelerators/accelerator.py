@@ -17,7 +17,6 @@ from typing import Any, Optional, Union
 import torch
 import torch.distributed as torch_distrib
 from torch.optim import Optimizer
-from torch.utils.data import DataLoader
 
 from pytorch_lightning.cluster_environments import ClusterEnvironment
 from pytorch_lightning.core.lightning import LightningModule
@@ -256,6 +255,8 @@ class Accelerator(object):
     def override_optimization(self):
         """
         Override to enable all forward/backward/optimization logic to be contained within the training step.
+        This is slightly different to user manually specified manual optimization; returning values from
+        the training step are logged.
         Returns: True if accelerator handles all optimization logic via the training step.
         """
         return False
@@ -267,21 +268,3 @@ class Accelerator(object):
     @property
     def require_distributed_sampler(self):
         raise NotImplementedError
-
-    def on_reset_train_dataloader(self, dataloader: Union[DataLoader, Any]) -> Union[DataLoader, Any]:
-        """
-        Override to access loader object when initializing/resetting during training.
-        Args:
-            dataloader: The data loader object.
-        Returns: The data loader object.
-        """
-        return dataloader
-
-    def on_reset_eval_dataloader(self, dataloader: Union[DataLoader, Any]) -> Union[DataLoader, Any]:
-        """
-        Override to access loader object when initializing/resetting during validation and testing.
-        Args:
-            dataloader: The data loader object.
-        Returns: The data loader object.
-        """
-        return dataloader

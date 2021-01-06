@@ -125,3 +125,33 @@ def move_data_to_device(batch: Any, device: torch.device):
 
     dtype = (TransferableDataType, Batch) if TORCHTEXT_AVAILABLE else TransferableDataType
     return apply_to_collection(batch, dtype=dtype, function=batch_to)
+
+
+def move_float_tensors_to_half(batch: Any):
+    """
+    Transfers all float32 tensors in batch to half precision.
+
+    Args:
+        batch: A float32 tensor or collection of float32 tensors.
+            See :func:`apply_to_collection` for a list of supported collection types.
+
+    Return:
+        the same collection but with all contained float32 tensors converted to half precision.
+    """
+
+    def batch_to(data):
+        # try to move torchtext data first
+        if TORCHTEXT_AVAILABLE and isinstance(data, Batch):
+
+            # Shallow copy because each Batch has a reference to Dataset which contains all examples
+            device_data = copy(data)
+            for field, field_value in data.dataset.fields.items():
+                if field_value is None:
+                    continue
+                device_field = move_float_tensors_to_half(getattr(data, field))
+                setattr(device_data, field, device_field)
+            return device_data
+        return data.half()
+
+    dtype = (torch.FloatTensor, Batch) if TORCHTEXT_AVAILABLE else torch.FloatTensor
+    return apply_to_collection(batch, dtype=dtype, function=batch_to)

@@ -152,11 +152,6 @@ class TrainerDataLoadingMixin(ABC):
         # automatically add samplers
         self.train_dataloader = self.auto_add_sampler(self.train_dataloader, shuffle=True)
 
-        # allow accelerator to make changes
-        if self.accelerator_backend is not None:
-            self.train_dataloader = self.accelerator_backend.on_reset_eval_dataloader(self.train_dataloader)
-
-
         self.num_training_batches = len(self.train_dataloader) if has_len(self.train_dataloader) else float('inf')
         self._worker_check(self.train_dataloader, 'train dataloader')
 

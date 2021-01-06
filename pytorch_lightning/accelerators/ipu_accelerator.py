@@ -22,7 +22,9 @@ from pytorch_lightning.accelerators.accelerator import Accelerator, ReduceOp
 from pytorch_lightning.cluster_environments import ClusterEnvironment
 from pytorch_lightning.core.lightning import LightningModule
 from pytorch_lightning.utilities import POPTORCH_AVAILABLE, rank_zero_info
+from pytorch_lightning.utilities.apply_func import move_float_tensors_to_half
 from pytorch_lightning.utilities.exceptions import MisconfigurationException
+from pytorch_lightning import _logger as log
 
 if POPTORCH_AVAILABLE:
     import poptorch
@@ -153,28 +155,32 @@ class IPUAccelerator(Accelerator):
         # allow for lr schedulers as well
         self.setup_optimizers(model)
 
+        self._check_num_optimizers(model)
+
         if self.half:
+            log.info('Using 16bit precision, converting model to FP16.')
             model = model.half()
 
-        # Wrap module
+        # Create model for training which will run training.
         self.train_model = IPUWrapperModule(model=model)
 
-        # Create model for training which will run training.
+        # todo: if I allocate ipus just for the val model, are the weights shared with my train model? how does this work?
+
         self.train_model = poptorch.trainingModel(
             model=self.train_model,
             options=self.training_opts,
             optimizer=self.trainer.optimizers[0]
         )
 
-        self.validation_model = IPUWrapperModule(model=model, mode='validation')
         # Create model for training which will run validation.
+        self.validation_model = IPUWrapperModule(model=model, mode='validation')
         self.validation_model = poptorch.inferenceModel(
             model=self.validation_model,
             options=self.inference_opts,
         )
 
-        self.test_model = IPUWrapperModule(model=model, mode='test')
         # Create model for training which will run testing.
+        self.test_model = IPUWrapperModule(model=model, mode='test')
         self.test_model = poptorch.inferenceModel(
             model=self.test_model,
             options=self.inference_opts,
@@ -193,11 +199,10 @@ class IPUAccelerator(Accelerator):
         return results
 
     def _step(self, model_step: Callable, args):
-        args[0] = self.to_type(args[0])
+        args = self.to_type(args)
         return model_step(*args[0])
 
     def training_step(self, args) -> None:
-        args = self.to_type(args)
         return self._step(self.train_model, args)
 
     def validation_step(self, args):
@@ -208,8 +213,7 @@ class IPUAccelerator(Accelerator):
 
     def to_type(self, batch):
         if self.mixed_precision or self.half:
-            # Move tensors to half precision.
-            return self.batch_to_device(batch, gpu_id)
+            return move_float_tensors_to_half(batch)
         return batch
 
     def sync_tensor(self,
@@ -226,20 +230,12 @@ class IPUAccelerator(Accelerator):
     def override_optimization(self):
         return True
 
-    def on_reset_train_dataloader(self, dataloader: Union[DataLoader, Any]) -> Union[DataLoader, Any]:
-        if isinstance(dataloader, DataLoader):
-            dataloader = self._convert_to_poptorch_loader(
-                dataloader=dataloader,
-                opts=self.training_opts
-            )
-        return dataloader
-
-    def on_reset_eval_dataloader(self, dataloader: Union[DataLoader, Any]) -> Union[DataLoader, Any]:
-        if isinstance(dataloader, DataLoader):
-            dataloader = self._convert_to_poptorch_loader(
-                dataloader=dataloader,
-                opts=self.inference_opts
-            )
+    def process_dataloader(self, dataloader):
+        opts = self.inference_opts if self.trainer.testing else self.training_opts
+        dataloader = self._convert_to_poptorch_loader(
+            dataloader=dataloader,
+            opts=opts
+        )
         return dataloader
 
     def _convert_to_poptorch_loader(self, dataloader, opts):
@@ -266,13 +262,32 @@ class IPUAccelerator(Accelerator):
     def add_argparse_args(cls, parser):
         parser = IPUOptsBuilder.add_argparse_args(parser)
         parser = IPUDebugOpts.add_argparse_args(parser)
+        parser.add_argument(
+            '--mixed_precision',
+            action='store_true',
+            help="Enable mixed precision (weights kept in FP32, inputs are in FP16)."
+        )
+        parser.add_argument(
+            '--half',
+            action='store_true',
+            help="Enable half precision (weights are in FP16, inputs are in FP16)."
+        )
         return parser
 
     @classmethod
-    def parse_opts(cls, args):
+    def from_opts(cls, args):
         opts = IPUOptsBuilder(args)
         IPUDebugOpts.parse_environment_debug_opts(args)
-        return opts.training_opts, opts.inference_opts
+        return cls(
+            training_opts=opts.training_opts,
+            inference_opts=opts.inference_opts,
+            mixed_precision=args.mixed_precision,
+            half=args.half
+        )
+
+    def _check_num_optimizers(self, model):
+        if len(model.trainer.optimizers) > 1:
+            raise MisconfigurationException("IPUs currently only support one optimizer.")
 
 
 class IPUWrapperModule(torch.nn.Module):
@@ -287,7 +302,7 @@ class IPUWrapperModule(torch.nn.Module):
         if not self.have_warned_on_first_iteration:
             rank_zero_info(
                 "First iteration will take longer as we are tracing the step function "
-                "and compiling the poplar graph for the IPUs."
+                "and compiling the graph for the IPUs."
             )
             self.have_warned_on_first_iteration = True
 

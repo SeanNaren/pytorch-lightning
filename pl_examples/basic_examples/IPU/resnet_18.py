@@ -37,7 +37,8 @@ class LitResnet(pl.LightningModule):
         self.save_hyperparameters()
         self.model = resnet18()
         self.model.fc = torch.nn.Linear(self.model.fc.in_features, 10)
-        self._example_input_array = torch.randn((1, 3, 32, 32))
+        # todo: fix forward example inference. Currently doesn't use accelerator to move to correct device
+        # self._example_input_array = torch.randn((1, 3, 224, 224))
 
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), lr=0.02)
@@ -95,13 +96,13 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', default=2, type=int)
     args = parser.parse_args()
 
-    training_opts, inference_opts = IPUAccelerator.parse_opts(args)
-
     train_loader = instantiate_dataset(batch_size=args.batch_size, num_workers=4)
-
-    accelerator = IPUAccelerator(training_opts, inference_opts)
 
     model = LitResnet()
 
+    accelerator = IPUAccelerator.from_opts(args)
     trainer = pl.Trainer.from_argparse_args(args, accelerator=accelerator)
+
+    pl.Trainer(devices=2, device_type='gpu')
+
     trainer.fit(model, train_loader)
