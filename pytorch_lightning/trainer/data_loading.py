@@ -152,6 +152,9 @@ class TrainerDataLoadingMixin(ABC):
         # automatically add samplers
         self.train_dataloader = self.auto_add_sampler(self.train_dataloader, shuffle=True)
 
+        # modify dataloader if needed (ddp, etc...)
+        self.train_dataloader = self.accelerator_backend.process_dataloader(self.train_dataloader)
+
         self.num_training_batches = len(self.train_dataloader) if has_len(self.train_dataloader) else float('inf')
         self._worker_check(self.train_dataloader, 'train dataloader')
 
@@ -234,9 +237,8 @@ class TrainerDataLoadingMixin(ABC):
                     rank_zero_warn(f'Your {mode}_dataloader has `shuffle=True`, it is best practice to turn'
                                    ' this off for validation and test dataloaders.')
 
-            # allow accelerator to make changes
-            if self.accelerator_backend is not None:
-                dataloaders[loader_i] = self.accelerator_backend.on_reset_eval_dataloader(loader)
+            # modify dataloader if needed (ddp, etc...)
+            dataloaders[loader_i] = self.accelerator_backend.process_dataloader(loader)
 
         if any([dl is None for dl in dataloaders]):
             rank_zero_warn("One of given dataloaders is None and it will be skipped.")

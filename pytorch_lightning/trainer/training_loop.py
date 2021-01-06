@@ -541,14 +541,11 @@ class TrainLoop:
         # get model
         model = self.trainer.get_model()
 
-        # modify dataloader if needed (ddp, etc...)
-        train_dataloader = self.trainer.accelerator_backend.process_dataloader(self.trainer.train_dataloader)
-
         # track epoch output
         epoch_output = [[] for _ in range(self.num_optimizers)]
 
         # enable profiling for the dataloader
-        train_dataloader = self.trainer.data_connector.get_profiled_train_dataloader(train_dataloader)
+        train_dataloader = self.trainer.data_connector.get_profiled_train_dataloader(self.trainer.train_dataloader)
         dataloader_idx = 0
         should_check_val = False
         for batch_idx, (batch, is_last_batch) in train_dataloader:

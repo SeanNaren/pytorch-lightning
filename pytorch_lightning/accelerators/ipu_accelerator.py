@@ -231,7 +231,7 @@ class IPUAccelerator(Accelerator):
         return True
 
     def process_dataloader(self, dataloader):
-        opts = self.inference_opts if self.trainer.testing else self.training_opts
+        opts = self.training_opts if self.trainer.model.training else self.inference_opts
         dataloader = self._convert_to_poptorch_loader(
             dataloader=dataloader,
             opts=opts
