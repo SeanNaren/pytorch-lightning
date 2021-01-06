@@ -241,7 +241,7 @@ class TrainerDataLoadingMixin(ABC):
 
             # allow accelerator to make changes
             if self.accelerator_backend is not None:
-                self.train_dataloader = self.accelerator_backend.on_reset_train_dataloader(loader)
+                dataloaders[loader_i] = self.accelerator_backend.on_reset_eval_dataloader(loader)
 
         if any([dl is None for dl in dataloaders]):
             rank_zero_warn("One of given dataloaders is None and it will be skipped.")

@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
+import os
 from typing import Any, Callable, Optional, Union
 
 import torch
@@ -35,15 +37,12 @@ class IPUOptsBuilder:
     This makes it easier to instantiate new opts from a shared set of arguments, and enforce
     options for inference.
     """
-    def __init__(self,
-                 num_device_iterations: int,
-                 replication_factor: int,
-                 gradient_accumulation: int,
-                 auto_round_num_ipus: int):
-        self.num_device_iterations = num_device_iterations
-        self.replication_factor = replication_factor
-        self.gradient_accumulation = gradient_accumulation
-        self.auto_round_num_ipus = auto_round_num_ipus
+
+    def __init__(self, args):
+        self.num_device_iterations = args.num_device_iterations
+        self.replication_factor = args.replication_factor
+        self.gradient_accumulation = args.gradient_accumulation
+        self.auto_round_num_ipus = args.auto_round_num_ipus
 
     @property
     def training_opts(self):
@@ -60,6 +59,65 @@ class IPUOptsBuilder:
         opts.Training.gradientAccumulation(gradient_accumulation)
         opts.autoRoundNumIPUs(self.auto_round_num_ipus)
         return opts
+
+    @classmethod
+    def add_argparse_args(cls, parser):
+        parser.add_argument(
+            '--gradient_accumulation',
+            default=1,
+            type=int,
+            help="Accumulate gradients. When using pipelining/model splitting it's a good idea to set this higher"
+                 "to allow better parallelization within the sequential pipeline."
+        )
+        parser.add_argument(
+            '--num_device_iterations',
+            default=1,
+            type=int,
+            help="Number of iterations to run directly on one IPU before returning. "
+                 "Improves Efficiency since loop runs directly on the IPU."
+        )
+        parser.add_argument(
+            '--replication_factor',
+            default=1,
+            type=int,
+            help="Defines the number of models to train in data parallel"
+        )
+        parser.add_argument(
+            '--auto_round_num_ipus',
+            action='store_true',
+            help="Allocate power of 2 IPUs regardless if the model doesn't utilize all IPUs. This is a hard"
+                 "requirement of reserving IPUs."
+        )
+        return parser
+
+
+class IPUDebugOpts:
+    @classmethod
+    def add_argparse_args(cls, parser):
+        parser.add_argument(
+            '--autoreport',
+            action='store_true',
+            help="Enable IPU reporting."
+        )
+        parser.add_argument(
+            '--autoreport_dir',
+            default=None,
+            type=str,
+            help="Save directory for logging, by default this uses the current working directory."
+        )
+        return parser
+
+    @classmethod
+    def parse_environment_debug_opts(cls, args):
+        if args.autoreport:
+            options = {
+                "autoReport.all": args.autoreport
+            }
+            if args.autoreport_dir:
+                if not os.path.exists(args.autoreport_dir):
+                    os.makedirs(args.autoreport_dir)
+                options["autoReport.directory"] = args.autoreport_dir
+            os.environ["POPLAR_ENGINE_OPTIONS"] = json.dumps(options)
 
 
 class IPUAccelerator(Accelerator):
@@ -94,6 +152,9 @@ class IPUAccelerator(Accelerator):
         # CHOOSE OPTIMIZER
         # allow for lr schedulers as well
         self.setup_optimizers(model)
+
+        if self.half:
+            model = model.half()
 
         # Wrap module
         self.train_model = IPUWrapperModule(model=model)
@@ -203,42 +264,14 @@ class IPUAccelerator(Accelerator):
 
     @classmethod
     def add_argparse_args(cls, parser):
-        parser.add_argument(
-            '--gradient_accumulation',
-            default=1,
-            type=int,
-            help="Accumulate gradients. When using pipelining/model splitting it's a good idea to set this higher"
-                 "to allow better parallelization within the sequential pipeline."
-        )
-        parser.add_argument(
-            '--num_device_iterations',
-            default=1,
-            type=int,
-            help="Number of iterations to run directly on one IPU before returning. "
-                 "Improves Efficiency since loop runs directly on the IPU."
-        )
-        parser.add_argument(
-            '--replication_factor',
-            default=1,
-            type=int,
-            help="Defines the number of models to train in data parallel"
-        )
-        parser.add_argument(
-            '--auto_round_num_ipus',
-            action='store_true',
-            help="Allocate power of 2 IPUs regardless if the model doesn't utilize all IPUs. This is a hard"
-                 "requirement of reserving IPUs."
-        )
+        parser = IPUOptsBuilder.add_argparse_args(parser)
+        parser = IPUDebugOpts.add_argparse_args(parser)
         return parser
 
     @classmethod
     def parse_opts(cls, args):
-        opts = IPUOptsBuilder(
-            num_device_iterations=args.num_device_iterations,
-            replication_factor=args.replication_factor,
-            gradient_accumulation=args.gradient_accumulation,
-            auto_round_num_ipus=args.auto_round_num_ipus,
-        )
+        opts = IPUOptsBuilder(args)
+        IPUDebugOpts.parse_environment_debug_opts(args)
         return opts.training_opts, opts.inference_opts
 
 

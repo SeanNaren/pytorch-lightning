@@ -15,7 +15,9 @@
 Experimental script to run a convolutional model using IPUs.
 Currently not using real data but fake generated data, primarily for debugging.
 
-python ipu_conv_sequential_example.py --max_epochs 1 --limit_val_batches 0
+python resnet_50.py --max_epochs 1 --limit_val_batches 0
+
+ResNet50 Requires model parallelism which is configured in the LightningModule below.
 
 """
 from argparse import ArgumentParser
@@ -26,8 +28,12 @@ import pytorch_lightning as pl
 from pl_examples import cli_lightning_logo
 from pytorch_lightning import Trainer
 from pytorch_lightning.accelerators import IPUAccelerator
+from pytorch_lightning.utilities import POPTORCH_AVAILABLE
 from torch.utils.data import Dataset
-from torchvision.models import resnet18
+from torchvision.models import resnet50
+
+if POPTORCH_AVAILABLE:
+    import poptorch
 
 
 class LitResnet(pl.LightningModule):
@@ -35,8 +41,18 @@ class LitResnet(pl.LightningModule):
         super().__init__()
 
         self.save_hyperparameters()
-        self.model = resnet18()
+        # Modify resnet50 into a sequential model to use automatic partitioning
+        self.model = resnet50()
         self.model.fc = torch.nn.Linear(self.model.fc.in_features, 10)
+
+        self.model.conv1 = poptorch.BeginBlock(self.model.conv1, ipu_id=0)
+        self.model.layer1[1] = poptorch.BeginBlock(self.model.layer1[1], ipu_id=1)
+        self.model.layer2[0] = poptorch.BeginBlock(self.model.layer2[0], ipu_id=2)
+        self.model.layer2[1] = poptorch.BeginBlock(self.model.layer2[1], ipu_id=3)
+        self.model.layer3[0] = poptorch.BeginBlock(self.model.layer3[0], ipu_id=4)
+        self.model.layer3[1] = poptorch.BeginBlock(self.model.layer3[1], ipu_id=5)
+        self.model.layer4[0] = poptorch.BeginBlock(self.model.layer4[0], ipu_id=6)
+        self.model.layer4[1] = poptorch.BeginBlock(self.model.layer4[1], ipu_id=7)
         self._example_input_array = torch.randn((1, 3, 32, 32))
 
     def configure_optimizers(self):
@@ -89,7 +105,7 @@ def instantiate_dataset(batch_size, num_workers):
 
 if __name__ == "__main__":
     cli_lightning_logo()
-    parser = ArgumentParser(description="IPU Convolution Example")
+    parser = ArgumentParser(description="IPU ResNet50 Example")
     parser = Trainer.add_argparse_args(parser)
     parser = IPUAccelerator.add_argparse_args(parser)
     parser.add_argument('--batch_size', default=2, type=int)
@@ -98,10 +114,9 @@ if __name__ == "__main__":
     training_opts, inference_opts = IPUAccelerator.parse_opts(args)
 
     train_loader = instantiate_dataset(batch_size=args.batch_size, num_workers=4)
-    val_loader = instantiate_dataset(batch_size=args.batch_size, num_workers=4)
     accelerator = IPUAccelerator(training_opts, inference_opts)
 
     model = LitResnet()
 
     trainer = pl.Trainer.from_argparse_args(args, accelerator=accelerator)
-    trainer.fit(model, train_loader, val_loader)
+    trainer.fit(model, train_loader)
