@@ -16,7 +16,6 @@ import os
 from typing import Any, Callable, Optional, Union
 
 import torch
-from torch.utils.data import DataLoader
 
 from pytorch_lightning.accelerators.accelerator import Accelerator, ReduceOp
 from pytorch_lightning.cluster_environments import ClusterEnvironment
