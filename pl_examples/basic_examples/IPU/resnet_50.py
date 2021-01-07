@@ -116,6 +116,7 @@ if __name__ == "__main__":
 
     model = LitResnet()
 
-    accelerator = IPUAccelerator.from_opts(args)
+    accelerator = IPUAccelerator.from_argparse_args(args)
     trainer = pl.Trainer.from_argparse_args(args, accelerator=accelerator)
+
     trainer.fit(model, train_loader)

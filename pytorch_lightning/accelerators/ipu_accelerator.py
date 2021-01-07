@@ -274,7 +274,7 @@ class IPUAccelerator(Accelerator):
         return parser
 
     @classmethod
-    def from_opts(cls, args):
+    def from_argparse_args(cls, args):
         opts = IPUOptsBuilder(args)
         IPUDebugOpts.parse_environment_debug_opts(args)
         return cls(
