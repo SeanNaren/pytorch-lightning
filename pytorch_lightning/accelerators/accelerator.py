@@ -69,7 +69,7 @@ class Accelerator(object):
 
         with self.precision_plugin.train_step_context():
             with self.training_type_plugin.train_step_context():
-                return self.lightning_module.training_step(*args)
+                return self.model(*args)
 
     def validation_step(self, args):
         batch = self.to_device(args[0])
@@ -78,7 +78,7 @@ class Accelerator(object):
 
         with self.precision_plugin.val_step_context():
             with self.training_type_plugin.val_step_context():
-                return self.lightning_module.validation_step(*args)
+                return self.model(*args)
 
     def test_step(self, args):
         batch = self.to_device(args[0])
@@ -87,7 +87,7 @@ class Accelerator(object):
 
         with self.precision_plugin.test_step_context():
             with self.training_type_plugin.test_step_context():
-                return self.lightning_module.test_step(*args)
+                return self.model(*args)
 
     def training_step_end(self, output):
         return output
@@ -154,6 +154,8 @@ class Accelerator(object):
     def setup_optimizers(self, trainer, model):
         if trainer.testing is True:
             return
+        if hasattr(self.training_type_plugin, 'init_optimizers'):
+            return self.training_type_plugin.init_optimizers(model)
         optimizers, lr_schedulers, optimizer_frequencies = trainer.init_optimizers(model)
         self.optimizers = optimizers
         self.lr_schedulers = lr_schedulers

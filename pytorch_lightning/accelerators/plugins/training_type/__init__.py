@@ -6,5 +6,6 @@ from pytorch_lightning.accelerators.plugins.training_type.horovod import Horovod
 from pytorch_lightning.accelerators.plugins.training_type.parallel import ParallelPlugin
 from pytorch_lightning.accelerators.plugins.training_type.sharded import DDPShardedPlugin
 from pytorch_lightning.accelerators.plugins.training_type.sharded_spawn import DDPSpawnShardedPlugin
+from pytorch_lightning.accelerators.plugins.training_type.deepspeed import DeepSpeedPlugin
 from pytorch_lightning.accelerators.plugins.training_type.single_device import SingleDevicePlugin
 from pytorch_lightning.accelerators.plugins.training_type.training_type_plugin import TrainingTypePlugin

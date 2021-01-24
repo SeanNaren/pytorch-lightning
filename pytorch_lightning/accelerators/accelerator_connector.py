@@ -20,10 +20,10 @@ from pytorch_lightning import _logger as log
 from pytorch_lightning.accelerators.accelerator import Accelerator
 from pytorch_lightning.accelerators.cpu import CPUAccelerator
 from pytorch_lightning.accelerators.gpu import GPUAccelerator
-from pytorch_lightning.accelerators.plugins import ApexMixedPrecisionPlugin, NativeMixedPrecisionPlugin, \
-    PrecisionPlugin, ShardedNativeMixedPrecisionPlugin
+from pytorch_lightning.accelerators.plugins import ApexMixedPrecisionPlugin, DeepSpeedPrecisionPlugin, \
+    NativeMixedPrecisionPlugin, PrecisionPlugin, ShardedNativeMixedPrecisionPlugin
 from pytorch_lightning.accelerators.plugins import SingleDevicePlugin, DDPPlugin, DDPSpawnPlugin, \
-    DataParallelPlugin, DDP2Plugin, HorovodPlugin, DDPShardedPlugin, DDPSpawnShardedPlugin
+    DataParallelPlugin, DDP2Plugin, DeepSpeedPlugin, HorovodPlugin, DDPShardedPlugin, DDPSpawnShardedPlugin
 from pytorch_lightning.cluster_environments.slurm_environment import SLURMEnvironment
 from pytorch_lightning.cluster_environments.torchelastic_environment import TorchElasticEnvironment
 from pytorch_lightning.tuner.auto_gpu_select import pick_multiple_gpus
@@ -64,6 +64,7 @@ class BackendConnector(object):
         amp_type, 
         amp_level,
         cluster_environment,
+        deepspeed_config,
     ):
 
         # initialization
@@ -71,6 +72,7 @@ class BackendConnector(object):
         self.use_ddp = False
         self.use_ddp2 = False
         self.use_horovod = False
+        self.use_deepspeed = False
         self.use_single_gpu = False
 
         self.num_processes = num_processes
@@ -87,6 +89,7 @@ class BackendConnector(object):
         self.amp_type = None if amp_type is None else amp_type.lower()
         self.amp_level = amp_level
         self.cluster_environment = cluster_environment
+        self.deepspeed_config = deepspeed_config
         self.is_slurm_managing_tasks = False
 
         # init the default rank if exists
@@ -178,6 +181,8 @@ class BackendConnector(object):
     def select_precision_plugin(self):
         if self.precision == 32:
             self.amp_type = None
+            if self.distributed_backend == "deepspeed":
+                return DeepSpeedPrecisionPlugin(precision=32)
             return PrecisionPlugin()
 
         elif self.precision == 16:
@@ -189,9 +194,12 @@ class BackendConnector(object):
                     self.amp_type = 'apex'
                 else:
                     log.info('Using native 16bit precision.')
+                    self.amp_type = AMPType.NATIVE
                     if self.distributed_backend == 'ddp_sharded' or self.distributed_backend == 'ddp_sharded_spawn':
                         return ShardedNativeMixedPrecisionPlugin()
-                    self.amp_type = AMPType.NATIVE
+                    if self.distributed_backend == "deepspeed":
+                        # deepspeed handles precision internally
+                        return DeepSpeedPrecisionPlugin(precision=16)
                     return NativeMixedPrecisionPlugin()
 
             if self.amp_type == 'apex':
@@ -206,6 +214,9 @@ class BackendConnector(object):
                         )
                     log.info('Using APEX 16bit precision.')
                     self.amp_type = AMPType.APEX
+                    if self.distributed_backend == "deepspeed":
+                        # deepspeed handles precision internally
+                        return DeepSpeedPrecisionPlugin(precision=16)
                     return ApexMixedPrecisionPlugin(self.amp_level)
         else:
             raise NotImplementedError('We only support precisions 32 and 16!')
@@ -251,6 +262,8 @@ class BackendConnector(object):
             )
         elif self.use_dp:
             plugin = DataParallelPlugin(parallel_devices=self.parallel_devices)
+        elif self.use_deepspeed:
+            plugin = DeepSpeedPlugin(config=self.deepspeed_config, parallel_devices=self.parallel_devices)
         elif self.use_horovod:
             plugin = HorovodPlugin(parallel_devices=self.parallel_devices)
         else:
@@ -356,6 +369,10 @@ class BackendConnector(object):
         # Sharded DDP
         elif self.distributed_backend in ("ddp_sharded", "ddp_sharded_spawn"):
             self.use_ddp = True
+
+        # DeepSpeed
+        elif self.distributed_backend == "deepspeed":
+            self.use_deepspeed = True
 
         # HOROVOD
         elif self.distributed_backend == "horovod":

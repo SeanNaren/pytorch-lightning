@@ -129,6 +129,11 @@ class LightningOptimizer:
             with trainer.profiler.profile(profiler_name):
                 xm.optimizer_step(optimizer, optimizer_args={'closure': closure, **kwargs})
 
+        elif trainer.distributed_backend == 'deepspeed':
+            # todo: not all deepspeed optimizers support closures, so we call the closure explicitly
+            closure()
+            trainer.call_hook("on_after_backward")
+            trainer.model.step(*args, **kwargs)
         # elif trainer.amp_backend is not None:
         #     # TODO: Adapt for new optimizer structure
         #     trainer.precision_connector.backend.optimizer_step(trainer, optimizer, closure)
