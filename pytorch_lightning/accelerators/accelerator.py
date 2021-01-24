@@ -156,6 +156,8 @@ class Accelerator(object):
     def setup_optimizers(self, trainer, model):
         if trainer.testing is True:
             return
+        if hasattr(self.training_type_plugin, 'init_optimizers'):
+            return self.training_type_plugin.init_optimizers(model)
         optimizers, lr_schedulers, optimizer_frequencies = trainer.init_optimizers(model)
         self.optimizers = optimizers
         self.lr_schedulers = lr_schedulers
