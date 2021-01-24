@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Union
 
 import torch
+from pytorch_lightning.accelerators.accelerator import Accelerator
 from torch.utils.data import DataLoader
 
 from pytorch_lightning import _logger as log
