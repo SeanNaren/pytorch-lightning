@@ -152,6 +152,11 @@ class DeepSpeedPlugin(ParallelPlugin):
         pass
 
     def _format_config(self):
+        if not self.config:
+            raise MisconfigurationException(
+                "To use DeepSpeed you must pass in a deepspeed config object or path to an object."
+                "todo: Doc Link."
+            )
         self._format_optimizer_config()
         self._format_batch_size_grad_accum_config()
         self._format_precision_config()
