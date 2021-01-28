@@ -9,9 +9,8 @@ from pytorch_lightning.accelerators.plugins.precision import PrecisionPlugin
 
 class DeepSpeedPrecisionPlugin(PrecisionPlugin):
 
-    def __init__(self, precision):
+    def __init__(self):
         super().__init__()
-        self.precision = precision
 
     def backward(
         self,
