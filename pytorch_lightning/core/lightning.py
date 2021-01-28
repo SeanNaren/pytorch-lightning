@@ -1163,10 +1163,7 @@ class LightningModule(
 
         """
         if self.trainer.train_loop.automatic_optimization or self._running_manual_backward:
-            if self.trainer.distributed_backend == 'deepspeed': # todo hack, should be in plugin somehow...
-                self.trainer.model.backward(loss, *args, **kwargs)
-            else:
-                loss.backward(*args, **kwargs)
+            loss.backward(*args, **kwargs)
 
     def toggle_optimizer(self, optimizer: Optimizer, optimizer_idx: int):
         """
