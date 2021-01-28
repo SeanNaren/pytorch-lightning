@@ -182,7 +182,7 @@ class BackendConnector(object):
         if self.precision == 32:
             self.amp_type = None
             if self.distributed_backend == "deepspeed":
-                return DeepSpeedPrecisionPlugin()
+                return DeepSpeedPrecisionPlugin(precision=32)
             return PrecisionPlugin()
 
         elif self.precision == 16:
@@ -199,7 +199,7 @@ class BackendConnector(object):
                         return ShardedNativeMixedPrecisionPlugin()
                     if self.distributed_backend == "deepspeed":
                         # deepspeed handles precision internally
-                        return DeepSpeedPrecisionPlugin()
+                        return DeepSpeedPrecisionPlugin(precision=16)
                     return NativeMixedPrecisionPlugin()
 
             if self.amp_type == 'apex':
@@ -216,7 +216,7 @@ class BackendConnector(object):
                     self.amp_type = AMPType.APEX
                     if self.distributed_backend == "deepspeed":
                         # deepspeed handles precision internally
-                        return DeepSpeedPrecisionPlugin()
+                        return DeepSpeedPrecisionPlugin(precision=16)
                     return ApexMixedPrecisionPlugin(self.amp_level)
         else:
             raise NotImplementedError('We only support precisions 32 and 16!')
