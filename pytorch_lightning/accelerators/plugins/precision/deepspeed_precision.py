@@ -26,7 +26,7 @@ class DeepSpeedPrecisionPlugin(PrecisionPlugin):
         # todo a hack around so that the model itself can run backwards...
         # todo this also means that the lightning module backward function is never called which may be unfavourable
         deepspeed_engine = lightning_module.trainer.model
-        deepspeed_engine.backwards(closure_loss)
+        deepspeed_engine.backward(closure_loss)
         # once backward has been applied, release graph
         closure_loss = closure_loss.detach()
 
